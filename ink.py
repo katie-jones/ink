@@ -61,9 +61,6 @@ class BackupManager:
         ''' Close all resources.'''
         # Close log file
         self.logfile.close()
-
-        # Print error info
-        traceback.print_exception(error_type, error_value, error_trace)
         return False
 
     def run(self):
