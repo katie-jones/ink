@@ -634,8 +634,8 @@ class BackupManager:
 
         return partition_mounted
 
-def main():
-    args = parse_args(sys.argv[1:])
+def main(argv):
+    args = parse_args(argv)
     try:
         with BackupManager(args) as backup_manager:
             backup_manager.run()
@@ -657,4 +657,4 @@ def parse_args(argv):
     return parser.parse_args(argv)
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])
