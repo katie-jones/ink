@@ -241,7 +241,7 @@ class BackupManager:
             last_backup = 0
 
         # Check if the last backup is too old
-        backup_outdated = (int(time.time()) - last_backup) > \
+        backup_outdated = (time.time() - last_backup) > \
             section_config.getint('frequency_seconds')
 
         if backup_outdated:
