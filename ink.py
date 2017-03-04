@@ -142,7 +142,8 @@ class BackupManager:
                              'partition_device': '',
                              'link_name': 'current',
                              'folder_prefix': 'backup-',
-                             'frequency_seconds': '{:d}'.format(60*60*24)
+                             'frequency_seconds': '{:d}'.format(60*60*24),
+                             'rebase_root': 'true'
                              };
         return config
 
@@ -286,15 +287,19 @@ class BackupManager:
         Get full name of folder to hold new backups and create the folder in
         the filesystem.
         '''
-        # Append name of directory to back up to the folder name (such that all
-        # backups start with root at /)
-        if section_config.get('to_backup')[0] == '/':
-            self.log(section_config.get('to_backup')[1:])
-            new_backup_folder = os.path.join(backup_folder_basename,
-                                             section_config.get('to_backup')[1:])
+        # Check if we should append name of directory to back up to the folder
+        # name (such that all backups start with root at /)
+        if section_config.getboolean('rebase_root'):
+            if section_config.get('to_backup')[0] == '/':
+                new_backup_folder = os.path.join(
+                    backup_folder_basename,
+                    section_config.get('to_backup')[1:])
+            else:
+                new_backup_folder = os.path.join(
+                    backup_folder_basename,
+                    section_config.get('to_backup'))
         else:
-            new_backup_folder = os.path.join(backup_folder_basename,
-                                             section_config.get('to_backup'))
+            new_backup_folder = backup_folder_basename
 
         # Make new backup folder
         try:
