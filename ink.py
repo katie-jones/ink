@@ -13,6 +13,7 @@ from enum import Enum
 
 class BackupManager:
     HISTORY_FILENAME = '/var/cache/ink/history'
+    LOG_FILENAME = '/var/log/ink/ink.log'
     SYSTEM_CONFIG_FILENAME = '/etc/ink/inkrc'
 
     MountStatus = Enum('MountStatus', 'NEWLY_MOUNTED ALREADY_MOUNTED')
@@ -30,14 +31,40 @@ class BackupManager:
 
         self.global_config = self.parse_config(files_to_parse)
 
-        self.logfile = None
-        self.errfile = None
-
         # Make history dir
         try:
             os.makedirs(os.path.dirname(self.HISTORY_FILENAME))
         except FileExistsError:
             pass
+        except PermissionError as e:
+            self.errlog("Permission denied. Try running as a member of the "
+            "group 'ink-users'. Exiting.")
+            raise(e)
+
+        # Make log dir
+        try:
+            os.makedirs(os.path.dirname(self.LOG_FILENAME))
+        except FileExistsError:
+            pass
+        except PermissionError as e:
+            self.errlog("Permission denied. Try running as a member of the "
+            "group 'ink-users'. Exiting.")
+            raise(e)
+
+    def __enter__(self):
+        ''' Open all resources required to generate backups.'''
+        # Open log file
+        self.logfile = open(self.LOG_FILENAME, 'a')
+        return self
+
+    def __exit__(self, error_type, error_value, error_trace):
+        ''' Close all resources.'''
+        # Close log file
+        self.logfile.close()
+
+        # Print error info
+        traceback.print_exception(error_type, error_value, error_trace)
+        return False
 
     def run(self):
         # Read initial history
@@ -49,25 +76,6 @@ class BackupManager:
             config_section = self.global_config[section]
             config_section = self.check_config(config_section)
 
-            # Make log and error directories
-            try:
-                os.makedirs(os.path.dirname(config_section.get('logfile')))
-            except FileExistsError:
-                pass
-            try:
-                os.makedirs(os.path.dirname(config_section.get('errfile')))
-            except FileExistsError:
-                pass
-
-            # Open log and error files
-            if len(config_section.get('logfile')) > 0:
-                self.logfile = open(config_section.get('logfile'), 'w')
-
-            if (config_section.get('logfile') !=
-                    config_section.get('errfile')) and \
-                    len(config_section.get('errfile')) > 0:
-                self.errfile = open(config_section.get('errfile'), 'w')
-
             # Log which section we're running
             self.log('Date: {:s}'.format(
                 self.get_current_time_formatted('%Y-%m-%d')), False)
@@ -78,13 +86,6 @@ class BackupManager:
                 # If backups were successful, add an entry in the cache file
                 history_writer.read_dict({section: {'last_backup':
                                                     int(time.time())}})
-            # Close log and error files
-            if self.logfile:
-                self.logfile.close()
-
-            if self.errfile:
-                self.errfile.close()
-
         with open(self.HISTORY_FILENAME, 'w') as history_file:
             history_writer.write(history_file)
 
@@ -139,8 +140,6 @@ class BackupManager:
                              'UUID': '',
                              'partition_label': '',
                              'partition_device': '',
-                             'logfile': '/var/log/ink/backups.log',
-                             'errfile': '/var/log/ink/backups.err',
                              'link_name': 'current',
                              'folder_prefix': 'backup-',
                              'frequency_seconds': '{:d}'.format(60*60*24)
@@ -151,24 +150,18 @@ class BackupManager:
         '''
         Log string to logfile.
         '''
-        if self.logfile is not None:
-            if print_time:
-                self.logfile.write('[{:s}] '.format(
-                    self.get_current_time_formatted()))
+        if print_time:
+            self.logfile.write('[{:s}] '.format(
+                self.get_current_time_formatted()))
 
-            self.logfile.write(string + '\n')
+        self.logfile.write(string + '\n')
         print(string)
 
     def errlog(self, string, print_time = True):
         '''
-        Log string to errfile.
+        Log error string to logfile.
         '''
-        if self.errfile is not None:
-            if print_time:
-                self.logfile.write('[{:s}] '.format(self.get_current_time_formatted()))
-
-            self.errfile.write(string + '\n')
-        print(string)
+        self.log('ERROR: ' + string, print_time)
 
     @staticmethod
     def get_current_time_formatted(date_format = '%H:%M:%S'):
@@ -232,7 +225,7 @@ class BackupManager:
         self.log('Checking if backup is outdated...')
         # Read history from cache
         parser = configparser.ConfigParser()
-        parser.read('/var/cache/ink/history')
+        parser.read(self.HISTORY_FILENAME)
 
         # Check if there is an entry for the given section
         try:
@@ -635,8 +628,12 @@ class BackupManager:
 
 def main():
     args = parse_args(sys.argv[1:])
-    backup_manager = BackupManager(args)
-    backup_manager.run()
+    try:
+        with BackupManager(args) as backup_manager:
+            backup_manager.run()
+    except Exception as e:
+        print('Making backups failed.')
+        traceback.print_exc()
 
 def parse_args(argv):
     '''
