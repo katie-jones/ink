@@ -120,7 +120,7 @@ class BackupManager:
         # Set all directory arguments to have no trailing slash
         directory_args = ['mount_point', 'backup_folder', 'to_backup', 'link_name']
         for arg in directory_args:
-            if config[arg][-1] == '/' and len(config[arg]) > 1:
+            if len(config[arg]) > 1 and config[arg][-1] == '/':
                 config[arg] = config[arg][:-1]
 
         return config
@@ -132,7 +132,7 @@ class BackupManager:
         ConfigParser's read_dict function.
         '''
         config = dict()
-        config['DEFAULT'] = {'mount_point': '/mnt/backups',
+        config['DEFAULT'] = {'mount_point': '',
                              'backup_folder': '%(mount_point)s',
                              'to_backup': '',
                              'backup_type': 'incremental',
@@ -179,13 +179,16 @@ class BackupManager:
         # option was given.
         if args.force_backup or self.backup_outdated(section):
             self.log('Making new backups.')
-            # Mount the drive where the backups should go
-            try:
-                mount_status = self.mount_drive(section)
-            except RuntimeError as e:
-                self.errlog('Error: ' + str(e))
-                self.errlog('Exiting.')
-                return False
+            # Mount the drive where the backups should go if a mount point was
+            # given
+            mount_status = self.MountStatus.ALREADY_MOUNTED
+            if len(section.get('mount_point')) > 0:
+                try:
+                    mount_status = self.mount_drive(section)
+                except RuntimeError as e:
+                    self.errlog('Error: ' + str(e))
+                    self.errlog('Exiting.')
+                    return False
 
             # Make the backups
             try:
