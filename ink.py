@@ -138,7 +138,8 @@ class BackupInstance:
             config.get('partition_device'))
 
         # Backup options
-        self._backup_folder = config.get('backup_folder')
+        self._backup_folder = os.path.join(config.get('mount_point'),
+                                           config.get('backup_folder'))
         self._to_backup = config.get('to_backup')
         self._backup_type = config.get('backup_type')
         self._exclude_file = config.get('exclude_file')
@@ -475,10 +476,30 @@ class BackupInstance:
         '''
         Check the syntax of the config arguments.
         '''
-        # Option 'to_backup' must be given
+        # Option 'to_backup' must be given and be an absolute path
         if len(config.get('to_backup')) == 0:
             raise ValueError("The directory to backup (option 'to_backup') "
                              "must be given.")
+        elif config.get('to_backup')[0] != '/':
+            raise ValueError("The directory to backup (option 'to_backup') "
+                             "must be an absolute path.")
+
+        # Option 'backup_folder' must be given
+        if len(config.get('backup_folder')) == 0:
+            raise ValueError("The directory where the backups are stored "
+                             "(option 'backup_folder') must be given.")
+
+        # Option 'mount_point' should be an absolute path
+        if len(config.get('mount_point')) > 0:
+            if config.get('mount_point')[0] != '/':
+                raise ValueError("The mount point of the backup partition should "
+                             "be an absolute path.")
+        else:
+            # If mount point is not given, 'backup_folder' should be an
+            # absolute path
+            if config.get('backup_folder')[0] != '/':
+                raise ValueError("No mount point is given, so the backup "
+                                 "folder should be an absolute path.")
 
         # Check that frequency is an int
         try:
