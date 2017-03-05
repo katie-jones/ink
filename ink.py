@@ -9,7 +9,11 @@ import argparse
 import configparser
 import datetime
 import shutil
+import logging
 from enum import Enum
+
+# Filename of log file for this module
+LOG_FILENAME = '/var/log/ink/ink.log'
 
 def run_shell_command(command, error_string = 'Shell command failed.'):
     '''
@@ -32,14 +36,13 @@ class PartitionManager:
 
     MountStatus = Enum('MountStatus', 'NEWLY_MOUNTED ALREADY_MOUNTED')
 
-    def __init__(self, mount_point, uuid, label, dev, logfile):
+    def __init__(self, mount_point, uuid, label, dev):
         ''' Initialize with the mount point of the partition and optionally its
         UUID, label or device identifier.'''
         self._mount_point = mount_point
         self._uuid = uuid
         self._label = label
         self._dev = dev
-        self._logfile = logfile
 
     def mount_partition(self):
         '''
@@ -56,11 +59,11 @@ class PartitionManager:
 
         # Check if a mount point was given
         if len(self._mount_point) == 0:
-            self._log('No mount point given. Not mounting a partition.')
+            logging.info('No mount point given. Not mounting a partition.')
         elif self._is_partition_mounted():
-            self._log('Partition is already mounted.')
+            logging.info('Partition is already mounted.')
         else:
-            self._log('Mounting partition to folder {:s}'.format(
+            logging.info('Mounting partition to folder {:s}'.format(
                           self._mount_point))
             # Initialize basic command
             shell_command = ["mount"]
@@ -78,7 +81,7 @@ class PartitionManager:
 
             # Run command
             run_shell_command(shell_command, 'Mounting backup disk failed.')
-            self._log('Partition mounted.')
+            logging.info('Partition mounted.')
 
             # Set mount status to newly mounted -- means we should unmount it
             # afterwards
@@ -93,12 +96,12 @@ class PartitionManager:
         '''
         # Only unmount if partition was not previously mounted.
         if self._mount_status == self.MountStatus.NEWLY_MOUNTED:
-            self._log('Unmounting partition...')
+            logging.info('Unmounting partition...')
             shell_command = ['umount', self._mount_point]
 
             # Unmount device
             run_shell_command(shell_command, 'Unmounting backup disk failed.')
-            self._log('Unmounting successful.')
+            logging.info('Unmounting successful.')
 
     def _is_partition_mounted(self):
         '''
@@ -116,37 +119,10 @@ class PartitionManager:
 
         return partition_mounted
 
-    def _log(self, string, print_time = True):
-        '''
-        Write string to logfile and print to console. If print_date is True:
-        prefix the date and time to the string.
-        '''
-        pass
-        #  if print_time:
-            #  self._logfile.write('[{:s}] '.format(
-                #  self.get_current_time_formatted()))
-
-        #  self._logfile.write(string + '\n')
-        #  print(string)
-
-    def _errlog(self, string, print_time = True):
-        '''
-        Write error string to logfile and print to console. If print_date is
-        True: prefix the date and time to the string.
-        '''
-        self.log('ERROR: ' + string, print_time)
-
-    @staticmethod
-    def _get_current_time_formatted(date_format = '%H:%M:%S'):
-        '''
-        Return current time, formatted using string date_format.
-        '''
-        return datetime.datetime.now().strftime(date_format)
-
 class BackupInstance:
     ''' A single instance of a backup generator for a specific
     configuration.'''
-    def __init__(self, config, force_backup, logfile):
+    def __init__(self, config, force_backup):
         ''' Initialize backup instance based on config read from file.'''
         # Check and fix config arguments
         config = self._check_config(config)
@@ -155,24 +131,23 @@ class BackupInstance:
         self.name = config.name
 
         # Manager for partition where backups should be created
-        self.partition_manager = PartitionManager(
+        self._partition_manager = PartitionManager(
             config.get('mount_point'),
             config.get('UUID'),
             config.get('partition_label'),
-            config.get('partition_device'),
-            logfile)
+            config.get('partition_device'))
 
         # Backup options
-        self.backup_folder = config.get('backup_folder')
-        self.to_backup = config.get('to_backup')
-        self.backup_type = config.get('backup_type')
-        self.exclude_file = config.get('exclude_file')
-        self.link_name = config.get('link_name')
-        self.folder_prefix = config.get('folder_prefix')
-        self.frequency = config.getint('frequency_seconds')
-        self.rebase_root = config.getboolean('rebase_root')
-        self.force_backup = force_backup
-        self._logfile = logfile
+        self._backup_folder = config.get('backup_folder')
+        self._to_backup = config.get('to_backup')
+        self._backup_type = config.get('backup_type')
+        self._exclude_file = config.get('exclude_file')
+        self._link_name = config.get('link_name')
+        self._folder_prefix = config.get('folder_prefix')
+        self._frequency = config.getint('frequency_seconds')
+        self._rebase_root = config.getboolean('rebase_root')
+        self._rsync_log_file = config.get('log_file')
+        self._force_backup = force_backup
 
     def run(self, last_backup):
         '''
@@ -183,23 +158,23 @@ class BackupInstance:
 
         # Run only if backup is outdate (needs to be run again) or if the force
         # option was given.
-        if self.force_backup or self._backup_outdated(last_backup):
-            self._log('Making new backups.')
+        if self._force_backup or self._backup_outdated(last_backup):
+            logging.info('Making new backups.')
             # Mount the drive where the backups should go
-            self.partition_manager.mount_partition()
+            self._partition_manager.mount_partition()
             # Make the backups
             try:
                 self._make_backups()
                 backups_made = True
             except Exception as e:
-                self._errlog('An error occurred making the backups.')
+                logging.error('An error occurred making the backups.')
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 traceback.print_exception(exc_type, exc_value, exc_traceback,
                                           limit=2, file=sys.stdout)
-                self._errlog(str(e))
+                logging.error(str(e))
 
             finally:
-                self.partition_manager.unmount_partition_if_needed()
+                self._partition_manager.unmount_partition_if_needed()
 
         return backups_made
 
@@ -207,17 +182,17 @@ class BackupInstance:
         '''
         Run rsync command to make new backups.
         '''
-        if self.backup_type == 'incremental':
+        if self._backup_type == 'incremental':
             self._make_backups_incremental()
-        elif self.backup_type == 'nolinks':
+        elif self._backup_type == 'nolinks':
             self._make_backups_nolinks()
-        elif self.backup_type == 'snapshot':
+        elif self._backup_type == 'snapshot':
             self._make_backups_snapshot()
-        elif self.backup_type == 'full':
+        elif self._backup_type == 'full':
             self._make_backups_full()
         else:
-            self._log('Backup type {:s} not recognized.'.format(
-                self.backup_type))
+            logging.info('Backup type {:s} not recognized.'.format(
+                self._backup_type))
 
     def _make_backups_incremental(self):
         '''
@@ -228,34 +203,27 @@ class BackupInstance:
 
         # Get name of actual backup folder
         new_backup_folder = self._get_backup_folder_name(new_backup_folder_base)
-        self._log('New backup folder: ' + new_backup_folder)
+        logging.info('New backup folder: ' + new_backup_folder)
 
         # Get name of previous (symlinked) backup folder
-        symlink_latest_backup_folder = os.path.join(self.backup_folder,
-                                                    self.link_name)
+        symlink_latest_backup_folder = os.path.join(self._backup_folder,
+                                                    self._link_name)
 
         # Set up rsync command
         shell_command = ['rsync', '-ax']
 
-        # If logfile exists, use it.
-        if self._logfile is not None:
-            shell_command.extend(['--log-file',
-                                  self.logfile])
+        # Add log and exclude files
+        shell_command = self._add_exclude_and_log_files(shell_command)
 
         # Check if symlink to previous backup exists
         if os.path.isdir(symlink_latest_backup_folder):
             shell_command.append('--link-dest=' + symlink_latest_backup_folder)
 
-        # Check if exclude file given
-        if len(self.exclude_file) > 0 and \
-                os.path.exists(self.exclude_file):
-            shell_command.append('--exclude-from=' + self.exclude_file)
-
         # Add source and destination
-        if self.to_backup == '/':
-            shell_command.extend([self.to_backup, new_backup_folder])
+        if self._to_backup == '/':
+            shell_command.extend([self._to_backup, new_backup_folder])
         else:
-            shell_command.extend([self.to_backup + '/',
+            shell_command.extend([self._to_backup + '/',
                                   new_backup_folder])
 
         # Run rsync command
@@ -265,7 +233,7 @@ class BackupInstance:
         self._replace_symlink(symlink_latest_backup_folder,
                               new_backup_folder_base)
 
-        self._log('Backups succeeded.')
+        logging.info('Backups succeeded.')
 
     def _make_backups_nolinks(self):
         '''
@@ -279,11 +247,11 @@ class BackupInstance:
 
         # Get name of actual backup folder
         new_backup_folder = self._get_backup_folder_name(new_backup_folder_base)
-        self._log('New backup folder: ' + new_backup_folder)
+        logging.info('New backup folder: ' + new_backup_folder)
 
         # Get name of previous (symlinked) backup folder
-        symlink_latest_backup_folder = os.path.join(self.backup_folder,
-                                                    self.link_name)
+        symlink_latest_backup_folder = os.path.join(self._backup_folder,
+                                                    self._link_name)
 
         # Set up rsync command
         shell_command = ['rsync', '-ax']
@@ -320,10 +288,10 @@ class BackupInstance:
         shell_command = self._add_exclude_and_log_files(shell_command)
 
         # Add source and destination
-        if self.to_backup == '/':
-            shell_command.extend([self.to_backup, new_backup_folder])
+        if self._to_backup == '/':
+            shell_command.extend([self._to_backup, new_backup_folder])
         else:
-            shell_command.extend([self.to_backup + '/',
+            shell_command.extend([self._to_backup + '/',
                                   new_backup_folder])
 
         # Run rsync command
@@ -333,7 +301,7 @@ class BackupInstance:
         self._replace_symlink(symlink_latest_backup_folder,
                               new_backup_folder_base)
 
-        self._log('Backups succeeded.')
+        logging.info('Backups succeeded.')
 
     def _make_backups_snapshot(self):
         '''
@@ -342,8 +310,8 @@ class BackupInstance:
         changes made over time.
         '''
         # Get name of actual backup folder
-        new_backup_folder = self.backup_folder
-        self._log('New backup folder: ' + new_backup_folder)
+        new_backup_folder = self._backup_folder
+        logging.info('New backup folder: ' + new_backup_folder)
 
         # Make sure new backup folder has trailing slash
         if new_backup_folder[-1] != '/':
@@ -356,16 +324,16 @@ class BackupInstance:
         shell_command = self._add_exclude_and_log_files(shell_command)
 
         # Add source and destination
-        if self.to_backup == '/':
-            shell_command.extend([self.to_backup, new_backup_folder])
+        if self._to_backup == '/':
+            shell_command.extend([self._to_backup, new_backup_folder])
         else:
-            shell_command.extend([self.to_backup + '/',
+            shell_command.extend([self._to_backup + '/',
                                   new_backup_folder])
 
         # Run rsync command
         run_shell_command(shell_command)
 
-        self._log('Backups succeeded.')
+        logging.info('Backups succeeded.')
 
     def _make_backups_full(self):
         '''
@@ -377,11 +345,11 @@ class BackupInstance:
 
         # Get name of actual backup folder
         new_backup_folder = self._get_backup_folder_name(new_backup_folder_base)
-        self._log('New backup folder: ' + new_backup_folder)
+        logging.info('New backup folder: ' + new_backup_folder)
 
         # Get name of previous (symlinked) backup folder
-        symlink_latest_backup_folder = os.path.join(self.backup_folder,
-                                                    self.link_name)
+        symlink_latest_backup_folder = os.path.join(self._backup_folder,
+                                                    self._link_name)
 
         # Set up rsync command
         shell_command = ['rsync', '-ax']
@@ -390,10 +358,10 @@ class BackupInstance:
         shell_command = self._add_exclude_and_log_files(shell_command)
 
         # Add source and destination
-        if self.to_backup == '/':
-            shell_command.extend([self.to_backup, new_backup_folder])
+        if self._to_backup == '/':
+            shell_command.extend([self._to_backup, new_backup_folder])
         else:
-            shell_command.extend([self.to_backup + '/',
+            shell_command.extend([self._to_backup + '/',
                                   new_backup_folder])
 
         # Run rsync command
@@ -403,7 +371,7 @@ class BackupInstance:
         self._replace_symlink(symlink_latest_backup_folder,
                               new_backup_folder_base)
 
-        self._log('Backups succeeded.')
+        logging.info('Backups succeeded.')
 
     def _get_backup_folder_basename(self):
         '''
@@ -415,8 +383,8 @@ class BackupInstance:
         '''
         # Get name of new backup folder
         new_backup_folder_base = os.path.join(
-            self.backup_folder,
-            self.folder_prefix + \
+            self._backup_folder,
+            self._folder_prefix + \
             datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
 
         # Make directory to hold new backup
@@ -443,15 +411,15 @@ class BackupInstance:
         '''
         # Check if we should append name of directory to back up to the folder
         # name (such that all backups start with root at /)
-        if self.rebase_root:
-            if self.to_backup[0] == '/':
+        if self._rebase_root:
+            if self._to_backup[0] == '/':
                 new_backup_folder = os.path.join(
                     backup_folder_basename,
-                    self.to_backup[1:])
+                    self._to_backup[1:])
             else:
                 new_backup_folder = os.path.join(
                     backup_folder_basename,
-                    self.to_backup)
+                    self._to_backup)
         else:
             new_backup_folder = backup_folder_basename
 
@@ -466,7 +434,6 @@ class BackupInstance:
             new_backup_folder = new_backup_folder + '/'
 
         return new_backup_folder
-
 
     @staticmethod
     def _replace_symlink(symlink_latest_backup_folder, new_backup_folder_base):
@@ -490,15 +457,16 @@ class BackupInstance:
         Add arguments for the exclude and logfiles to the rsync command given
         in shell_command.
         '''
-        #  If logfile exists, use it.
-        #  if self.logfile is not None:
-            #  shell_command.extend(['--log-file',
-                                  #  section_config.get('logfile')])
+        # Check if log file given
+        if len(self._rsync_log_file) > 0 and \
+                os.path.exists(os.path.dirname(self._rsync_log_file)):
+            shell_command.extend(['--log-file',
+                                  self._rsync_log_file])
 
         # Check if exclude file given
-        if len(self.exclude_file) > 0 and \
-                os.path.exists(self.exclude_file):
-            shell_command.append('--exclude-from=' + self.exclude_file)
+        if len(self._exclude_file) > 0 and \
+                os.path.exists(self._exclude_file):
+            shell_command.append('--exclude-from=' + self._exclude_file)
 
         return shell_command
 
@@ -534,56 +502,24 @@ class BackupInstance:
         '''
         Returns true if the last backup made is outdated.
         '''
-        self._log('Checking if backup is outdated...')
+        logging.info('Checking if backup is outdated...')
 
         # Check if the last backup is too old
         backup_outdated = (time.time() - last_backup) > \
-            self.frequency
+            self._frequency
 
         if backup_outdated:
-            self._log('Previous backup is outdated. Running new backups.')
+            logging.info('Previous backup is outdated. Running new backups.')
         else:
-            self._log('Previous backup not outdated. Not running new backups.')
+            logging.info('Previous backup not outdated. Not running new backups.')
 
         return backup_outdated
-
-    def _log(self, string, print_time = True):
-        '''
-        Write string to logfile and print to console. If print_date is True:
-        prefix the date and time to the string.
-        '''
-        pass
-        #  if print_time:
-            #  self._logfile.write('[{:s}] '.format(
-                #  self._get_current_time_formatted()))
-
-        #  self._logfile.write(string + '\n')
-        #  print(string)
-
-    def _errlog(self, string, print_time = True):
-        '''
-        Write error string to logfile and print to console. If print_date is
-        True: prefix the date and time to the string.
-        '''
-        self._log('ERROR: ' + string, print_time)
-
-    @staticmethod
-    def _get_current_time_formatted(date_format = '%H:%M:%S'):
-        '''
-        Return current time, formatted using string date_format.
-        '''
-        return datetime.datetime.now().strftime(date_format)
-
-class RsyncCommandGenerator:
-    ''' A class to generate rsync commands based on backup configuration.'''
-    pass
 
 class BackupManager:
     '''
     Class to manage multiple sets of backups based on configuration files.
     '''
     HISTORY_FILENAME = '/var/cache/ink/history'
-    LOG_FILENAME = '/var/log/ink/ink.log'
     SYSTEM_CONFIG_FILENAME = '/etc/ink/inkrc'
 
     def __init__(self, argv):
@@ -603,36 +539,18 @@ class BackupManager:
 
         config = self.parse_config(files_to_parse)
 
-        self.logfile = None
 
         # Initialize backup instances
         self.backup_instances = []
         for section in config.sections():
             self.backup_instances.append(BackupInstance(config[section],
-                                                        self.args.force_backup,
-                                                        self.logfile))
+                                                        self.args.force_backup))
 
         # Make history dir
         self._make_system_directory_if_not_exists(self.HISTORY_FILENAME)
 
         # Make log dir
-        self._make_system_directory_if_not_exists(self.LOG_FILENAME)
-
-    def __enter__(self):
-        '''
-        Open all resources required to generate backups.
-        '''
-        # Open log file
-        self.logfile = open(self.LOG_FILENAME, 'a')
-        return self
-
-    def __exit__(self, error_type, error_value, error_trace):
-        '''
-        Close all resources.
-        '''
-        # Close log file
-        self.logfile.close()
-        return False
+        self._make_system_directory_if_not_exists(LOG_FILENAME)
 
     def run(self):
         # Read initial history
@@ -642,9 +560,7 @@ class BackupManager:
         # Loop through sections and run backups for each one
         for backup_instance in self.backup_instances:
             # Log which section we're running
-            self._log('Date: {:s}'.format(
-                self._get_current_time_formatted('%Y-%m-%d')), False)
-            self._log('Running section {:s}'.format(backup_instance.name))
+            logging.info('Running section {:s}'.format(backup_instance.name))
 
             # Run backups
             if backup_instance.run(history_writer.getint(backup_instance.name,
@@ -707,6 +623,7 @@ class BackupManager:
                              'to_backup': '',
                              'backup_type': 'incremental',
                              'exclude_file': '',
+                             'log_file': '',
                              'UUID': '',
                              'partition_label': '',
                              'partition_device': '',
@@ -717,37 +634,12 @@ class BackupManager:
                              };
         return config
 
-    def _log(self, string, print_time = True):
-        '''
-        Write string to logfile and print to console. If print_date is True:
-        prefix the date and time to the string.
-        '''
-        pass
-        #  if print_time:
-            #  self.logfile.write('[{:s}] '.format(
-                #  self._get_current_time_formatted()))
-
-        #  self.logfile.write(string + '\n')
-        #  print(string)
-
-    def _errlog(self, string, print_time = True):
-        '''
-        Write error string to logfile and print to console. If print_date is
-        True: prefix the date and time to the string.
-        '''
-        self.log('ERROR: ' + string, print_time)
-
-    @staticmethod
-    def _get_current_time_formatted(date_format = '%H:%M:%S'):
-        '''
-        Return current time, formatted using string date_format.
-        '''
-        return datetime.datetime.now().strftime(date_format)
-
 def main(argv):
+    logging.basicConfig(filename = LOG_FILENAME, level = logging.INFO,
+                        format='[%(asctime)s] %(levelname)s: %(message)s')
     try:
-        with BackupManager(argv) as backup_manager:
-            backup_manager.run()
+        backup_manager = BackupManager(argv)
+        backup_manager.run()
     except Exception as e:
         print('Making backups failed.')
         traceback.print_exc()
