@@ -29,6 +29,17 @@ def run_shell_command(command, error_string = 'Shell command failed.'):
     if p.returncode != 0:
         raise RuntimeError(error_string)
 
+def path_is_parent(parent_path, child_path):
+    '''
+    Returns True if parent_path is a parent of child_path, False otherwise.
+    '''
+    # Smooth out relative path names, note: if you are concerned about symbolic links, you should use os.path.realpath too
+    parent_path = os.path.realpath(parent_path)
+    child_path = os.path.realpath(child_path)
+
+    # Compare the common path of the parent and child path with the common path of just the parent path.
+    return os.path.commonpath([parent_path]) == os.path.commonpath([parent_path, child_path])
+
 class PartitionManager:
     '''
     A class to manage mounting and unmounting partitions.
@@ -472,8 +483,9 @@ class BackupInstance:
                 os.path.exists(self._exclude_file):
             shell_command.append('--exclude-from=' + self._exclude_file)
 
-        # Exclude the mount point
-        if len(self._mount_point) > 0:
+        # Exclude the mount point if it is a subdirectory of to_backup
+        if len(self._mount_point) > 0 and path_is_parent(self.to_backup,
+                                                         self._mount_point):
             shell_command.extend('--exclude', os.path.relpath(self._mount_point,
                                                               self.to_backup))
 
