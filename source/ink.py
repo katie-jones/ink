@@ -420,11 +420,12 @@ class BackupInstance:
                 os.path.exists(self._exclude_file):
             shell_command.append('--exclude-from=' + self._exclude_file)
 
-        # Exclude the mount point if it is a subdirectory of to_backup
-        if len(self._mount_point) > 0 and path_is_parent(self.to_backup,
-                                                         self._mount_point):
-            shell_command.extend('--exclude', os.path.relpath(self._mount_point,
-                                                              self.to_backup))
+        # Exclude the backup directory if it is a subdirectory of to_backup
+        if len(self._backup_folder) > 0 and path_is_parent(self.to_backup,
+                                                           self._backup_folder):
+            shell_command.extend('--exclude',
+                                 os.path.relpath(self._backup_folder,
+                                                 self.to_backup))
 
         return shell_command
 
