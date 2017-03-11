@@ -472,6 +472,11 @@ class BackupInstance:
                 os.path.exists(self._exclude_file):
             shell_command.append('--exclude-from=' + self._exclude_file)
 
+        # Exclude the mount point
+        if len(self._mount_point) > 0:
+            shell_command.extend('--exclude', os.path.relpath(self._mount_point,
+                                                              self.to_backup))
+
         return shell_command
 
     @staticmethod
