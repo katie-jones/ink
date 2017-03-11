@@ -29,7 +29,7 @@ systemctl enable ink.timer
 
 ### Package Managers
 #### Pacman
-A PKGBUILD is provided that installs the python module and wrapper script, copies the systemd files to their respective directories, and moves the sample config file to /etc/ink/inkrc.
+A PKGBUILD is provided in the packages/ directory that installs the python module and wrapper script, copies the systemd files to their respective directories, and moves the sample config file to /etc/ink/inkrc.
 To allow ink to run automatically, the systemd timer must still be initialized, as described above.
 
 ## Usage
