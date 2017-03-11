@@ -150,7 +150,7 @@ class BackupInstance:
         self._folder_prefix = config.get('folder_prefix')
         self._frequency = config.getint('frequency_seconds')
         self._rebase_root = config.getboolean('rebase_root')
-        self._rsync_log_file = config.get('log_file')
+        self._rsync_log_file = config.get('rsync_log_file')
         self._force_backup = force_backup
 
     def run(self):
@@ -652,7 +652,7 @@ class BackupManager:
                              'to_backup': '',
                              'backup_type': 'incremental',
                              'exclude_file': '',
-                             'log_file': '',
+                             'rsync_log_file': '',
                              'UUID': '',
                              'partition_label': '',
                              'partition_device': '',
