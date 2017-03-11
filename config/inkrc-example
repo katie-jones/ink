@@ -1,0 +1,30 @@
+# A sample configuration for ink.
+# To use: uncomment/adjust the appropriate lines and move to /etc/ink/inkrc.
+# See github.com/katie-jones/ink for details.
+#
+#
+# # Add section [home]
+# [home]
+# ----------------------------------------------------- mandatory arguments
+# # Mount point for partition to hold backups, blank if no partition is
+# # mounted (absolute path)
+# mount_point=/mnt/backups/home
+# # Directory (relative to mount_point) to hold backups
+# backup_folder=
+# # Directory to backup (absolute path)
+# to_backup=/home
+# # File holding rsync excludes
+# exclude_file=/home/.excludes
+# ------------------------------------------------------ optional arguments
+# # Rsync log file
+# rsync_log_file=/var/log/ink/home.log
+# # Name of generated symlink that points to most recent backup
+# link_name=current
+# # Prefix to backup folder names
+# folder_prefix=home-
+# # Frequency at which to run backups
+# frequency_seconds=86400
+# # Backup type (incremental [default], nolinks, snapshot, full)
+# backup_type=incremental
+# # Cross filesystems
+# cross_filesystems=false
