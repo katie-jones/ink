@@ -1,5 +1,5 @@
 # Setup script for ink package
-from distutils.core import setup
+from setuptools import setup
 
 setup(name = 'Ink',
       version = '1.0',
@@ -7,5 +7,8 @@ setup(name = 'Ink',
       author = 'Katie Jones',
       author_email = 'k.jo133@gmail.com',
       url = 'https://github.com/katie-jones/ink',
-      py_modules = ['ink']
+      py_modules = ['ink'],
+      entry_points = {
+          'console_scripts': ['run-ink=ink:main_from_command_line']
+      }
       )

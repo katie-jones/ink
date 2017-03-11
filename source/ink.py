@@ -664,6 +664,9 @@ class BackupManager:
         return config
 
 def main(argv):
+    '''
+    Main function to set up BackupManager using the options given in argv.
+    '''
     logging.basicConfig(filename = LOG_FILENAME, level = logging.INFO,
                         format='[%(asctime)s] %(levelname)s: %(message)s')
     try:
@@ -673,5 +676,12 @@ def main(argv):
         print('Making backups failed.')
         traceback.print_exc()
 
-if __name__ == "__main__":
+def main_from_command_line():
+    '''
+    Main function to be used from command line (calls main() using the
+    command-line arguments).
+    '''
     main(sys.argv[1:])
+
+if __name__ == "__main__":
+    main_from_command_line()
