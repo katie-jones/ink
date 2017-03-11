@@ -1,6 +1,6 @@
 # Maintainer: Katie Jones <k.jo133@gmail.com>
-pkgname=ink
-pkgver=0.1
+pkgname=ink-git
+pkgver=1.0
 pkgrel=1
 pkgdesc="A backup manager"
 arch=('any')
@@ -22,14 +22,14 @@ noextract=()
 md5sums=('SKIP')
 
 check() {
-    cd "$pkgname"
+    cd "$pkgname"/source
     python -m unittest test_ink.py
 }
 
 package() {
-  cd "$pkgname"
+  # Change to source directory
+  cd "$pkgname"/source
 
-  # Copy ink to /usr/bin
-  mkdir -p "$pkgdir/usr/bin/"
-  cp "ink.py" "$pkgdir/usr/bin/ink"
+  # Install using setup.py
+  python setup.py install --root="$pkgname" --prefix="/usr"
 }
