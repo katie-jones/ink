@@ -1,5 +1,6 @@
 # Maintainer: Katie Jones <k.jo133@gmail.com>
 pkgname=ink-git
+_pkgname=ink
 pkgver=1.0
 pkgrel=1
 pkgdesc="A backup manager"
@@ -22,13 +23,13 @@ noextract=()
 md5sums=('SKIP')
 
 check() {
-    cd "$pkgname"/source
+    cd "$_pkgname"/source
     python -m unittest test_ink.py
 }
 
 package() {
   # Change to source directory
-  cd "$pkgname"/source
+  cd "$_pkgname"/source
 
   # Install using setup.py
   python setup.py install --root="$pkgdir" --prefix="/usr"
