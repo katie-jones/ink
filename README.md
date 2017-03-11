@@ -77,3 +77,11 @@ The name of a file to write rsync logs. Note that this is not the same as the
 log file for ink, which is in /var/log/ink/ink.log.
   Default: (none)
   Required: no
+
+### cross\_filesystems
+Equivalent to rsync option -x.
+If false, do not cross filesystems when making backups.
+That means if a folder inside of *to\_backup* is a mount point for another filesystem (e.g. /boot is mounted within /), it will be ignored in the backup.
+This is a safe option to avoid backing up directories in /mnt that should most likely be ignored.
+Default: False
+Required: No

@@ -163,6 +163,7 @@ class BackupInstance:
         self._rebase_root = config.getboolean('rebase_root')
         self._rsync_log_file = config.get('rsync_log_file')
         self._force_backup = force_backup
+        self._cross_filesystems = config.getboolean('cross_filesystems')
 
     def run(self):
         '''
@@ -211,7 +212,13 @@ class BackupInstance:
         '''
         Get the basic rsync command as a list of strings.
         '''
-        shell_command = ['rsync', '-ax']
+        # Basic command - rsync with archive option
+        shell_command = ['rsync', '-a']
+
+        # If cross_filesystems disabled, add -x option
+        if not self._cross_filesystems:
+            shell_command.append('-x')
+
         return shell_command
 
     def _make_backups_common(self):
@@ -606,7 +613,8 @@ class BackupManager:
                              'link_name': 'current',
                              'folder_prefix': 'backup-',
                              'frequency_seconds': '{:d}'.format(60*60*24),
-                             'rebase_root': 'true'
+                             'rebase_root': 'true',
+                             'cross_filesystems': 'false',
                              };
         return config
 
