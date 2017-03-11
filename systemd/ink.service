@@ -1,0 +1,6 @@
+[Unit]
+Description=Run ink, creating new backups if necessary
+
+[Service]
+Type=simple
+ExecStart=+/usr/bin/env run_ink

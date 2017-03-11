@@ -1,0 +1,9 @@
+[Unit]
+Description=Run ink hourly, creating new backups if needed
+
+[Timer]
+OnBootSec=23min
+OnUnitActiveSec=1h
+
+[Install]
+WantedBy=timers.target
