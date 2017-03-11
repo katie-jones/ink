@@ -577,9 +577,10 @@ class BackupManager:
         '''
         parser = argparse.ArgumentParser(description='Make local backups of disk.')
         parser.add_argument('config_filename', default = '', nargs = '?',
-                            help='Path to configuration file.')
+                            help='Path to additional configuration file.')
         parser.add_argument('--ignore-system-config', action='store_false',
-                            dest='use_system_config')
+                            dest='use_system_config', help = 'Ignore the '
+                            'system configuration file.')
         parser.add_argument('-f', dest='force_backup', action='store_true',
                             help='Force backup regardless of time stamp')
         return parser.parse_args(argv)
