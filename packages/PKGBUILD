@@ -39,12 +39,13 @@ package() {
 
   # Install systemd files
   echo "Installing systemd service and timer files."
-  cp -v "systemd/ink.{service,timer}" "$pkgdir"/etc/system/systemd/
+  mkdir -p "$pkgdir"/etc/systemd/system
+  cp -v systemd/ink.* "$pkgdir"/etc/systemd/system/
   echo "To activate systemd timer, as root, run:"
   echo "    systemctl enable ink.timer"
 
   # Add sample config file
   echo "Adding sample config file."
-  mkdir -f "$pkgdir"/etc/ink
+  mkdir -p "$pkgdir"/etc/ink
   cp -v "config/inkrc-example" "$pkgdir"/etc/ink
 }
