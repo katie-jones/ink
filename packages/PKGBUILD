@@ -9,7 +9,7 @@ url="https://github.com/katie-jones/ink"
 license=('GPL')
 groups=()
 depends=('python>=3.5')
-makedepends=('git')
+makedepends=('git python-setuptools')
 optdepends=('systemd: For scheduling runs')
 provides=()
 conflicts=()
