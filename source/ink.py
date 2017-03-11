@@ -237,7 +237,7 @@ class BackupInstance:
                                                     self._link_name)
 
         # Set up rsync command
-        shell_command = self._get_base_command()
+        shell_command = self._get_base_rsync_command()
 
         # Add log and exclude files
         shell_command = self._add_exclude_and_log_files(shell_command)
