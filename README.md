@@ -4,9 +4,33 @@ Ink is a tool for managing regular, local backups of a file system.
 It uses *rsync* for performing file transfers, though it does not (yet) have support for making backups remotely, as rsync does.
 
 ## Installation
+### Manual Installation
+#### Python Module
 Ink is implemented in a single Python file that can be used as a script or as a Python module.
-It can be installed by copying the file source/ink.py to either a directory in the user's path (e.g. /usr/local/bin) for use as a script, or to a directory in the Python system path (e.g. /usr/lib/python3.\*/site-packages) for use as a Python module.
-For convenience, a PKGBUILD file is given to
+The easiest way to install ink is by using the setup.py script provided:
+```bash
+python setup.py install
+```
+
+This script will install the ink module in its default package directory, and will create a wrapper script run-ink in the user's path that calls ink's main function.
+
+#### Configuration File
+A sample configuration file is given in config/inkrc-example.
+This file should be edited and moved to /etc/ink/inkrc.
+
+#### systemd
+For convenience, a systemd service that runs ink using the default system configuration file is provided, along with a corresponding timer that automatically runs ink once per hour (systemd/ink.{service,timer}).
+These files should be copied to /etc/systemd/system.
+The service can then be started/stopped manually as any systemd service.
+To use the automatic timer (similar to a cron job), it must first be enabled:
+```bash
+systemctl enable ink.timer
+```
+
+### Package Managers
+#### Pacman
+A PKGBUILD is provided that installs the python module and wrapper script, copies the systemd files to their respective directories, and moves the sample config file to /etc/ink/inkrc.
+To allow ink to run automatically, the systemd timer must still be initialized, as described above.
 
 ## Usage
 ### Configuration File

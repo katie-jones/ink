@@ -31,5 +31,19 @@ package() {
   cd "$pkgname"/source
 
   # Install using setup.py
-  python setup.py install --root="$pkgname" --prefix="/usr"
+  python setup.py install --root="$pkgdir" --prefix="/usr"
+
+  # Change back to root directory
+  cd ..
+
+  # Install systemd files
+  echo "Installing systemd service and timer files."
+  cp -v "systemd/ink.{service,timer}" "$pkgdir"/etc/system/systemd/
+  echo "To activate systemd timer, as root, run:"
+  echo "    systemctl enable ink.timer"
+
+  # Add sample config file
+  echo "Adding sample config file."
+  mkdir -f "$pkgdir"/etc/ink
+  cp -v "config/inkrc-example" "$pkgdir"/etc/ink
 }
