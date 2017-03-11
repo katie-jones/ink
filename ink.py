@@ -122,13 +122,16 @@ class PartitionManager:
 class BackupInstance:
     ''' A single instance of a backup generator for a specific
     configuration.'''
-    def __init__(self, config, force_backup):
+    def __init__(self, config, force_backup, last_backup = 0):
         ''' Initialize backup instance based on config read from file.'''
         # Check and fix config arguments
         config = self._check_config(config)
 
         # Set instance name
         self.name = config.name
+
+        # Set last backup
+        self.last_backup = last_backup
 
         # Manager for partition where backups should be created
         self._partition_manager = PartitionManager(
@@ -140,7 +143,7 @@ class BackupInstance:
         # Backup options
         self._backup_folder = os.path.join(config.get('mount_point'),
                                            config.get('backup_folder'))
-        self._to_backup = config.get('to_backup')
+        self.to_backup = config.get('to_backup')
         self._backup_type = config.get('backup_type')
         self._exclude_file = config.get('exclude_file')
         self._link_name = config.get('link_name')
@@ -150,7 +153,7 @@ class BackupInstance:
         self._rsync_log_file = config.get('log_file')
         self._force_backup = force_backup
 
-    def run(self, last_backup):
+    def run(self):
         '''
         Run backups. Check if current backups are outdated (or if force option
         was given) and make new backups if necessary.
@@ -159,7 +162,7 @@ class BackupInstance:
 
         # Run only if backup is outdate (needs to be run again) or if the force
         # option was given.
-        if self._force_backup or self._backup_outdated(last_backup):
+        if self._force_backup or self._backup_outdated(self.last_backup):
             logging.info('Making new backups.')
             # Mount the drive where the backups should go
             self._partition_manager.mount_partition()
@@ -221,10 +224,10 @@ class BackupInstance:
             shell_command.append('--link-dest=' + symlink_latest_backup_folder)
 
         # Add source and destination
-        if self._to_backup == '/':
-            shell_command.extend([self._to_backup, new_backup_folder])
+        if self.to_backup == '/':
+            shell_command.extend([self.to_backup, new_backup_folder])
         else:
-            shell_command.extend([self._to_backup + '/',
+            shell_command.extend([self.to_backup + '/',
                                   new_backup_folder])
 
         # Run rsync command
@@ -289,10 +292,10 @@ class BackupInstance:
         shell_command = self._add_exclude_and_log_files(shell_command)
 
         # Add source and destination
-        if self._to_backup == '/':
-            shell_command.extend([self._to_backup, new_backup_folder])
+        if self.to_backup == '/':
+            shell_command.extend([self.to_backup, new_backup_folder])
         else:
-            shell_command.extend([self._to_backup + '/',
+            shell_command.extend([self.to_backup + '/',
                                   new_backup_folder])
 
         # Run rsync command
@@ -325,10 +328,10 @@ class BackupInstance:
         shell_command = self._add_exclude_and_log_files(shell_command)
 
         # Add source and destination
-        if self._to_backup == '/':
-            shell_command.extend([self._to_backup, new_backup_folder])
+        if self.to_backup == '/':
+            shell_command.extend([self.to_backup, new_backup_folder])
         else:
-            shell_command.extend([self._to_backup + '/',
+            shell_command.extend([self.to_backup + '/',
                                   new_backup_folder])
 
         # Run rsync command
@@ -359,10 +362,10 @@ class BackupInstance:
         shell_command = self._add_exclude_and_log_files(shell_command)
 
         # Add source and destination
-        if self._to_backup == '/':
-            shell_command.extend([self._to_backup, new_backup_folder])
+        if self.to_backup == '/':
+            shell_command.extend([self.to_backup, new_backup_folder])
         else:
-            shell_command.extend([self._to_backup + '/',
+            shell_command.extend([self.to_backup + '/',
                                   new_backup_folder])
 
         # Run rsync command
@@ -413,14 +416,14 @@ class BackupInstance:
         # Check if we should append name of directory to back up to the folder
         # name (such that all backups start with root at /)
         if self._rebase_root:
-            if self._to_backup[0] == '/':
+            if self.to_backup[0] == '/':
                 new_backup_folder = os.path.join(
                     backup_folder_basename,
-                    self._to_backup[1:])
+                    self.to_backup[1:])
             else:
                 new_backup_folder = os.path.join(
                     backup_folder_basename,
-                    self._to_backup)
+                    self.to_backup)
         else:
             new_backup_folder = backup_folder_basename
 
@@ -560,12 +563,22 @@ class BackupManager:
 
         config = self.parse_config(files_to_parse)
 
+        # Read initial history
+        self.history_reader = configparser.ConfigParser()
+        self.history_reader.read_dict({'DEFAULT': {'last_backup': 0}})
+        self.history_reader.read(self.HISTORY_FILENAME)
 
         # Initialize backup instances
         self.backup_instances = []
         for section in config.sections():
+            try:
+                last_backup = self.history_reader.getint(section, 'last_backup')
+            except configparser.NoSectionError:
+                last_backup = 0
+
             self.backup_instances.append(BackupInstance(config[section],
-                                                        self.args.force_backup))
+                                                        self.args.force_backup,
+                                                        last_backup))
 
         # Make history dir
         self._make_system_directory_if_not_exists(self.HISTORY_FILENAME)
@@ -574,24 +587,19 @@ class BackupManager:
         self._make_system_directory_if_not_exists(LOG_FILENAME)
 
     def run(self):
-        # Read initial history
-        history_writer = configparser.ConfigParser()
-        history_writer.read(self.HISTORY_FILENAME)
-
         # Loop through sections and run backups for each one
         for backup_instance in self.backup_instances:
             # Log which section we're running
             logging.info('Running section {:s}'.format(backup_instance.name))
 
             # Run backups
-            if backup_instance.run(history_writer.getint(backup_instance.name,
-                                                         'last_backup')):
+            if backup_instance.run():
                 # If backups were successful, add an entry in the cache file
-                history_writer.read_dict({backup_instance.name: {'last_backup':
+                self.history_reader.read_dict({backup_instance.name: {'last_backup':
                                                     int(time.time())}})
         # Write updated history
         with open(self.HISTORY_FILENAME, 'w') as history_file:
-            history_writer.write(history_file)
+            self.history_reader.write(history_file)
 
     def _make_system_directory_if_not_exists(self, filename):
         '''
