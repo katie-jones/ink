@@ -258,7 +258,7 @@ class RunBackupsUnitTest(unittest.TestCase):
         # Expect the first backup directory to contain the first file
         self._compare_directory_content([self.files[0]],
                                         first_backup_dirname)
-        
+
         # Expect all other files to not exist in first backup directory
         for filecfg in self.files[1:]:
             self.assertFalse(os.path.isfile(os.path.join(first_backup_dirname,
@@ -304,7 +304,7 @@ class RunBackupsUnitTest(unittest.TestCase):
         # original
         self._compare_directory_content(self.files,
                                         first_backup_dirname)
-        
+
         # Expect none of the files to be hardlinks
         for filecfg in updated_files[1:]:
             self.assertFalse(self._is_hard_link(
@@ -427,6 +427,50 @@ class RunBackupsUnitTest(unittest.TestCase):
         backup_dirname = os.path.realpath(
             os.path.join(self.backups_container_dirname, self.link_name))
         self.assertNotEqual(backup_dirname, first_backup_dirname)
+
+    def test_default_exclude(self):
+        '''
+        Test that the folder containing the backups is excluded when it is a
+        child of the directory being backed up.
+        '''
+        print('')
+        print('Running test default_exclude.')
+        # Set backup type to incremental
+        config = self._get_testing_config()
+        config['testing']['backup_type'] = 'incremental'
+
+        # Backup the root directory
+        config['testing']['to_backup'] = self.root_dir.name
+        self._write_config_file(config)
+
+        # Run backups with the relevant command line arguments
+        ink.main(self.argv)
+
+        # Get the directory containing the most recent backups
+        backup_dirname = os.path.realpath(
+            os.path.join(self.backups_container_dirname, self.link_name))
+
+        # List the files in the backup directory
+        ink.run_shell_command(['ls', backup_dirname])
+
+        # Check that the folder containing the backups does not exist in the
+        # backup
+        path_to_check = os.path.join(
+                    backup_dirname,
+                    os.path.relpath(
+                        self.backups_container_dirname,
+                        self.root_dir.name)
+                )
+        self.assertFalse(os.path.exists(path_to_check))
+
+        # Check that all other files do
+        self._compare_directory_content(
+            self.files,
+            os.path.join(
+                backup_dirname,
+                os.path.relpath(self.orig_dirname,self.root_dir.name)
+            )
+        )
 
     def tearDown(self):
         # Clean up temporary directory
