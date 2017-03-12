@@ -423,9 +423,9 @@ class BackupInstance:
         # Exclude the backup directory if it is a subdirectory of to_backup
         if len(self._backup_folder) > 0 and path_is_parent(self.to_backup,
                                                            self._backup_folder):
-            shell_command.extend('--exclude',
-                                 os.path.relpath(self._backup_folder,
-                                                 self.to_backup))
+            shell_command.extend(['--exclude',
+                                 os.path.sep + os.path.relpath(self._backup_folder,
+                                                 self.to_backup)])
 
         return shell_command
 
