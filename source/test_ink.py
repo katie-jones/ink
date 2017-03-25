@@ -41,6 +41,10 @@ class RunBackupsUnitTest(unittest.TestCase):
         # Create config file for backups
         self.config_filename = os.path.join(self.root_dir.name, 'test.cfg')
 
+        # Set directory names for log and cache
+        self.log_directory = os.path.join(self.root_dir.name, 'log')
+        self.cache_directory = os.path.join(self.root_dir.name, 'cache')
+
         # Create some files and directories to back up
         # Structure is:
         # +-- a (This is file a.)
@@ -52,7 +56,9 @@ class RunBackupsUnitTest(unittest.TestCase):
         self._create_original_files(self.files)
 
         # Define command line arguments for running backups
-        self.argv = [self.config_filename, '--ignore-system-config']
+        self.argv = [self.config_filename, '--ignore-system-config',
+                     '--log-directory', self.log_directory,
+                     '--cache-directory', self.cache_directory]
 
     def _write_config_file(self, config):
         ''' Write the configuration given in dict config to the config file.'''
@@ -74,8 +80,6 @@ class RunBackupsUnitTest(unittest.TestCase):
                              'UUID': '',
                              'partition_label': '',
                              'partition_device': '',
-                             'logfile': self.log_filename,
-                             'errfile': self.log_filename,
                              'link_name': 'current',
                              'folder_prefix': 'backup-',
                              'frequency_seconds': '0',
@@ -449,9 +453,6 @@ class RunBackupsUnitTest(unittest.TestCase):
         # Get the directory containing the most recent backups
         backup_dirname = os.path.realpath(
             os.path.join(self.backups_container_dirname, self.link_name))
-
-        # List the files in the backup directory
-        ink.run_shell_command(['ls', backup_dirname])
 
         # Check that the folder containing the backups does not exist in the
         # backup
