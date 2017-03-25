@@ -12,9 +12,6 @@ import shutil
 import logging
 from enum import Enum
 
-# Filename of log file for this module
-LOG_FILENAME = '/var/log/ink/ink.log'
-
 def run_shell_command(command, error_string = 'Shell command failed.'):
     '''
     Run a shell command given as a list of strings corresponding to the
@@ -498,8 +495,9 @@ class BackupManager:
     '''
     Class to manage multiple sets of backups based on configuration files.
     '''
-    HISTORY_FILENAME = '/var/cache/ink/history'
+    HISTORY_RELATIVE_PATH = 'ink/history'
     SYSTEM_CONFIG_FILENAME = '/etc/ink/inkrc'
+    LOG_RELATIVE_PATH = 'ink/ink.log'
 
     def __init__(self, argv):
         '''
@@ -507,6 +505,14 @@ class BackupManager:
         '''
         # Parse command line arguments
         self.args = self._parse_args(argv)
+
+        # Set log filename
+        self.log_filename = os.path.join(self.args.log_directory,
+                                         self.LOG_RELATIVE_PATH)
+
+        # Set history filename
+        self.history_filename = os.path.join(self.args.cache_directory,
+                                             self.HISTORY_RELATIVE_PATH)
 
         # Parse config from config file
         files_to_parse = []
@@ -521,7 +527,7 @@ class BackupManager:
         # Read initial history
         self.history_reader = configparser.ConfigParser()
         self.history_reader.read_dict({'DEFAULT': {'last_backup': 0}})
-        self.history_reader.read(self.HISTORY_FILENAME)
+        self.history_reader.read(self.history_filename)
 
         # Initialize backup instances
         self.backup_instances = []
@@ -536,10 +542,14 @@ class BackupManager:
                                                         last_backup))
 
         # Make history dir
-        self._make_system_directory_if_not_exists(self.HISTORY_FILENAME)
+        self._make_system_directory_if_not_exists(self.history_filename)
 
         # Make log dir
-        self._make_system_directory_if_not_exists(LOG_FILENAME)
+        self._make_system_directory_if_not_exists(self.log_filename)
+
+        # Setup logging config
+        logging.basicConfig(filename = self.log_filename, level = logging.INFO,
+                        format='[%(asctime)s] %(levelname)s: %(message)s')
 
     def run(self):
         # Loop through sections and run backups for each one
@@ -553,7 +563,7 @@ class BackupManager:
                 self.history_reader.read_dict({backup_instance.name: {'last_backup':
                                                     int(time.time())}})
         # Write updated history
-        with open(self.HISTORY_FILENAME, 'w') as history_file:
+        with open(self.history_filename, 'w') as history_file:
             self.history_reader.write(history_file)
 
     def _make_system_directory_if_not_exists(self, filename):
@@ -584,6 +594,22 @@ class BackupManager:
                             'system configuration file.')
         parser.add_argument('-f', dest='force_backup', action='store_true',
                             help='Force backup regardless of time stamp')
+        parser.add_argument(
+            '--log-directory',
+            dest = 'log_directory',
+            default = '/var/log',
+            help = "Path to directory where log should be stored. A folder "
+            "named 'ink' will be created in this directory to hold log files. "
+            "Default is '/var/log'."
+        )
+        parser.add_argument(
+            '--cache-directory',
+            dest = 'cache_directory',
+            default = '/var/cache',
+            help = "Path to directory where cache should be stored. A folder"
+            " named 'ink' will be created in this directory to hold cache "
+            "files. Default is '/var/cache'."
+        )
         return parser.parse_args(argv)
 
     @staticmethod
@@ -624,8 +650,6 @@ def main(argv):
     '''
     Main function to set up BackupManager using the options given in argv.
     '''
-    logging.basicConfig(filename = LOG_FILENAME, level = logging.INFO,
-                        format='[%(asctime)s] %(levelname)s: %(message)s')
     try:
         backup_manager = BackupManager(argv)
         backup_manager.run()
