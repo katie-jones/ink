@@ -1,7 +1,7 @@
 # Maintainer: Katie Jones <k.jo133@gmail.com>
 pkgname=ink-git
 _pkgname=ink
-pkgver=1.0
+pkgver=0.9
 pkgrel=1
 pkgdesc="A backup manager"
 arch=('any')
@@ -18,7 +18,7 @@ backup=()
 options=()
 install=
 changelog=
-source=('git+git://github.com/katie-jones/ink.git')
+source=('git+git://github.com/katie-jones/ink.git#'$pkgver)
 noextract=()
 md5sums=('SKIP')
 
