@@ -38,6 +38,9 @@ class RunBackupsUnitTest(unittest.TestCase):
         # Define symlink name for most recent backups
         self.link_name = 'current'
 
+        # Define date format for backups
+        self.date_format = '%T'
+
         # Create config file for backups
         self.config_filename = os.path.join(self.root_dir.name, 'test.cfg')
 
@@ -83,7 +86,8 @@ class RunBackupsUnitTest(unittest.TestCase):
                              'link_name': 'current',
                              'folder_prefix': 'backup-',
                              'frequency_seconds': '0',
-                             'rebase_root': 'false'
+                             'rebase_root': 'false',
+                             'date_format': self.date_format.replace('%', '%%'),
                              };
         return config
 
