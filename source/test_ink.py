@@ -477,6 +477,49 @@ class RunBackupsUnitTest(unittest.TestCase):
             )
         )
 
+    def test_nolinks_linkname(self):
+        ''' Test that after running a nolinks backup, the 'current' link points
+        to a full backup, not the partial one. '''
+        print('')
+        print('Running test nolinks_linkname.')
+        # Set backup type to incremental
+        config = self._get_testing_config()
+        config['testing']['backup_type'] = 'incremental'
+        self._write_config_file(config)
+
+        # Run backups with the relevant command line arguments
+        ink.main(self.argv)
+
+        # Get the directory containing the most recent backups
+        first_backup_dirname = os.path.realpath(
+            os.path.join(self.backups_container_dirname, self.link_name))
+
+        # Set backup type to nolinks
+        config['testing']['backup_type'] = 'nolinks'
+        self._write_config_file(config)
+
+        # Sleep for 1 second to make sure backups run again
+        time.sleep(1)
+
+        # Run backups again
+        ink.main(self.argv)
+
+        # Get the directory containing the most recent backups
+        backup_dirname = os.path.realpath(
+            os.path.join(self.backups_container_dirname, self.link_name))
+
+        # List contents of backups directory
+        print('')
+        print('Contents of {:s}'.format(self.backups_container_dirname))
+        ink.run_shell_command(['ls', '-l', self.backups_container_dirname])
+        print('')
+        print('Contents of {:s}'.format(first_backup_dirname + '_bak'))
+        ink.run_shell_command(['ls', '-l', first_backup_dirname + '_bak'])
+        print('')
+        print('Contents of {:s}'.format(backup_dirname))
+        ink.run_shell_command(['ls', '-l', backup_dirname])
+        print('')
+
     def tearDown(self):
         # Clean up temporary directory
         self.root_dir.cleanup()
