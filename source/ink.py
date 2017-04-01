@@ -161,6 +161,7 @@ class BackupInstance:
         self._rsync_log_file = config.get('rsync_log_file')
         self._force_backup = force_backup
         self._cross_filesystems = config.getboolean('cross_filesystems')
+        self._date_format = config.get('date_format')
 
     def run(self):
         '''
@@ -334,7 +335,7 @@ class BackupInstance:
         new_backup_folder_base = os.path.join(
             self._backup_folder,
             self._folder_prefix + \
-            datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
+            datetime.datetime.now().strftime(self._date_format))
 
         # Make directory to hold new backup
         n = 0
@@ -643,6 +644,7 @@ class BackupManager:
                              'frequency_seconds': '{:d}'.format(60*60*24),
                              'rebase_root': 'true',
                              'cross_filesystems': 'false',
+                             'date_format': '%%Y-%%m-%%dT%%H:%%M',
                              };
         return config
 

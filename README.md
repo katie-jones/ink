@@ -133,6 +133,13 @@ This is a safe option to avoid backing up directories in /mnt that should most l
 Default: False  
 Required: No
 
+#### date\_format
+The format to use for the current date when creating backup folders.
+The syntax is the same as that of the ```date``` command (see ```man date``` for details).
+Note that the '%' symbols in the date format must escaped by repeating them.  
+  Default: %%Y-%%m-%%dT%%H:%%M
+  Required: No
+
 ### Command-line Arguments
 usage: ink.py [-h] [--ignore-system-config] [-f] [config_filename]
 
