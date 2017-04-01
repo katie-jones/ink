@@ -210,8 +210,8 @@ class BackupInstance:
         '''
         Get the basic rsync command as a list of strings.
         '''
-        # Basic command - rsync with archive option
-        shell_command = ['rsync', '-a']
+        # Basic command - rsync with archive and update option
+        shell_command = ['rsync', '-au']
 
         # If cross_filesystems disabled, add -x option
         if not self._cross_filesystems:
