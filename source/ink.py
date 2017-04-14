@@ -10,7 +10,10 @@ import configparser
 import datetime
 import shutil
 import logging
+import logging.handlers
 from enum import Enum
+
+LOG_RELATIVE_PATH = 'ink/ink.log'
 
 def run_shell_command(command, error_string = 'Shell command failed.'):
     '''
@@ -52,6 +55,9 @@ class PartitionManager:
         self._label = label
         self._dev = dev
 
+        # Logger
+        self.logger = logging.getLogger(__name__)
+
     def mount_partition(self):
         '''
         Mount the partition to the mount point specified in the
@@ -67,11 +73,11 @@ class PartitionManager:
 
         # Check if a mount point was given
         if len(self._mount_point) == 0:
-            logging.info('No mount point given. Not mounting a partition.')
+            self.logger.info('No mount point given. Not mounting a partition.')
         elif self._is_partition_mounted():
-            logging.info('Partition is already mounted.')
+            self.logger.info('Partition is already mounted.')
         else:
-            logging.info('Mounting partition to folder {:s}'.format(
+            self.logger.info('Mounting partition to folder {:s}'.format(
                           self._mount_point))
             # Initialize basic command
             shell_command = ["mount"]
@@ -89,7 +95,7 @@ class PartitionManager:
 
             # Run command
             run_shell_command(shell_command, 'Mounting backup disk failed.')
-            logging.info('Partition mounted.')
+            self.logger.info('Partition mounted.')
 
             # Set mount status to newly mounted -- means we should unmount it
             # afterwards
@@ -104,12 +110,12 @@ class PartitionManager:
         '''
         # Only unmount if partition was not previously mounted.
         if self._mount_status == self.MountStatus.NEWLY_MOUNTED:
-            logging.info('Unmounting partition...')
+            self.logger.info('Unmounting partition...')
             shell_command = ['umount', self._mount_point]
 
             # Unmount device
             run_shell_command(shell_command, 'Unmounting backup disk failed.')
-            logging.info('Unmounting successful.')
+            self.logger.info('Unmounting successful.')
 
     def _is_partition_mounted(self):
         '''
@@ -163,6 +169,9 @@ class BackupInstance:
         self._cross_filesystems = config.getboolean('cross_filesystems')
         self._date_format = config.get('date_format')
 
+        # Logger
+        self.logger = logging.getLogger(__name__)
+
     def run(self):
         '''
         Run backups. Check if current backups are outdated (or if force option
@@ -173,7 +182,7 @@ class BackupInstance:
         # Run only if backup is outdate (needs to be run again) or if the force
         # option was given.
         if self._force_backup or self._backup_outdated(self.last_backup):
-            logging.info('Making new backups.')
+            self.logger.info('Making new backups.')
             # Mount the drive where the backups should go
             self._partition_manager.mount_partition()
             # Make the backups
@@ -181,11 +190,11 @@ class BackupInstance:
                 self._make_backups()
                 backups_made = True
             except Exception as e:
-                logging.error('An error occurred making the backups.')
+                self.logger.error('An error occurred making the backups.')
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 traceback.print_exception(exc_type, exc_value, exc_traceback,
                                           limit=2, file=sys.stdout)
-                logging.error(str(e))
+                self.logger.error(str(e))
 
             finally:
                 self._partition_manager.unmount_partition_if_needed()
@@ -203,7 +212,7 @@ class BackupInstance:
         elif self._backup_type == 'snapshot':
             self._make_backups_snapshot()
         else:
-            logging.info('Backup type {:s} not recognized.'.format(
+            self.logger.info('Backup type {:s} not recognized.'.format(
                 self._backup_type))
 
     def _get_base_rsync_command(self):
@@ -228,7 +237,7 @@ class BackupInstance:
 
         # Get name of actual backup folder
         new_backup_folder = self._get_backup_folder_name(new_backup_folder_base)
-        logging.info('New backup folder: ' + new_backup_folder)
+        self.logger.info('New backup folder: ' + new_backup_folder)
 
         # Get name of previous (symlinked) backup folder
         symlink_latest_backup_folder = os.path.join(self._backup_folder,
@@ -288,7 +297,7 @@ class BackupInstance:
         self._replace_symlink(symlink_latest_backup_folder,
                               new_backup_folder_base)
 
-        logging.info('Backups succeeded.')
+        self.logger.info('Backups succeeded.')
 
     def _make_backups_snapshot(self):
         '''
@@ -298,7 +307,7 @@ class BackupInstance:
         '''
         # Get name of actual backup folder
         new_backup_folder = self._backup_folder
-        logging.info('New backup folder: ' + new_backup_folder)
+        self.logger.info('New backup folder: ' + new_backup_folder)
 
         # Make sure new backup folder has trailing slash
         if new_backup_folder[-1] != '/':
@@ -321,7 +330,7 @@ class BackupInstance:
         # Run rsync command
         run_shell_command(shell_command)
 
-        logging.info('Backups succeeded.')
+        self.logger.info('Backups succeeded.')
 
     def _get_backup_folder_basename(self):
         '''
@@ -480,16 +489,16 @@ class BackupInstance:
         '''
         Returns true if the last backup made is outdated.
         '''
-        logging.info('Checking if backup is outdated...')
+        self.logger.info('Checking if backup is outdated...')
 
         # Check if the last backup is too old
         backup_outdated = (time.time() - last_backup) > \
             self._frequency
 
         if backup_outdated:
-            logging.info('Previous backup is outdated. Running new backups.')
+            self.logger.info('Previous backup is outdated. Running new backups.')
         else:
-            logging.info('Previous backup not outdated. Not running new backups.')
+            self.logger.info('Previous backup not outdated. Not running new backups.')
 
         return backup_outdated
 
@@ -499,18 +508,13 @@ class BackupManager:
     '''
     HISTORY_RELATIVE_PATH = 'ink/history'
     SYSTEM_CONFIG_FILENAME = '/etc/ink/inkrc'
-    LOG_RELATIVE_PATH = 'ink/ink.log'
 
-    def __init__(self, argv):
+    def __init__(self, args):
         '''
-        Initialize using command line arguments.
+        Initialize using command line arguments in an object.
         '''
-        # Parse command line arguments
-        self.args = self._parse_args(argv)
-
-        # Set log filename
-        self.log_filename = os.path.join(self.args.log_directory,
-                                         self.LOG_RELATIVE_PATH)
+        # Set command line arguments
+        self.args = args
 
         # Set history filename
         self.history_filename = os.path.join(self.args.cache_directory,
@@ -546,18 +550,14 @@ class BackupManager:
         # Make history dir
         self._make_system_directory_if_not_exists(self.history_filename)
 
-        # Make log dir
-        self._make_system_directory_if_not_exists(self.log_filename)
-
-        # Setup logging config
-        logging.basicConfig(filename = self.log_filename, level = logging.INFO,
-                        format='[%(asctime)s] %(levelname)s: %(message)s')
+        # Initialize logger
+        self.logger = logging.getLogger(__name__)
 
     def run(self):
         # Loop through sections and run backups for each one
         for backup_instance in self.backup_instances:
             # Log which section we're running
-            logging.info('Running section {:s}'.format(backup_instance.name))
+            self.logger.info('Running section {:s}'.format(backup_instance.name))
 
             # Run backups
             if backup_instance.run():
@@ -579,40 +579,9 @@ class BackupManager:
         except FileExistsError:
             pass
         except PermissionError as e:
-            self.errlog("Permission denied. Try running as a member of the "
-            "group 'ink-users'. Exiting.")
+            self.errlog("Permission denied. Exiting.")
             raise(e)
 
-    @staticmethod
-    def _parse_args(argv):
-        '''
-        Parse command line arguments.
-        '''
-        parser = argparse.ArgumentParser(description='Make local backups of disk.')
-        parser.add_argument('config_filename', default = '', nargs = '?',
-                            help='Path to additional configuration file.')
-        parser.add_argument('--ignore-system-config', action='store_false',
-                            dest='use_system_config', help = 'Ignore the '
-                            'system configuration file.')
-        parser.add_argument('-f', dest='force_backup', action='store_true',
-                            help='Force backup regardless of time stamp')
-        parser.add_argument(
-            '--log-directory',
-            dest = 'log_directory',
-            default = '/var/log',
-            help = "Path to directory where log should be stored. A folder "
-            "named 'ink' will be created in this directory to hold log files. "
-            "Default is '/var/log'."
-        )
-        parser.add_argument(
-            '--cache-directory',
-            dest = 'cache_directory',
-            default = '/var/cache',
-            help = "Path to directory where cache should be stored. A folder"
-            " named 'ink' will be created in this directory to hold cache "
-            "files. Default is '/var/cache'."
-        )
-        return parser.parse_args(argv)
 
     @staticmethod
     def parse_config(files_to_parse):
@@ -649,13 +618,82 @@ class BackupManager:
                              };
         return config
 
+def parse_args(argv):
+    '''
+    Parse command line arguments.
+    '''
+    parser = argparse.ArgumentParser(description='Make local backups of disk.')
+    parser.add_argument('config_filename', default = '', nargs = '?',
+                        help='Path to additional configuration file.')
+    parser.add_argument('--ignore-system-config', action='store_false',
+                        dest='use_system_config', help = 'Ignore the '
+                        'system configuration file.')
+    parser.add_argument('-f', dest='force_backup', action='store_true',
+                        help='Force backup regardless of time stamp')
+    parser.add_argument(
+        '--log-directory',
+        dest = 'log_directory',
+        default = '/var/log',
+        help = "Path to directory where log should be stored. A folder "
+        "named 'ink' will be created in this directory to hold log files. "
+        "Default is '/var/log'."
+    )
+    parser.add_argument(
+        '--cache-directory',
+        dest = 'cache_directory',
+        default = '/var/cache',
+        help = "Path to directory where cache should be stored. A folder"
+        " named 'ink' will be created in this directory to hold cache "
+        "files. Default is '/var/cache'."
+    )
+    return parser.parse_args(argv)
+
 def main(argv):
     '''
     Main function to set up BackupManager using the options given in argv.
     '''
     try:
-        backup_manager = BackupManager(argv)
+        # Setup logging format
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.DEBUG)
+        logformat = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s')
+
+        # Remove previous logging handlers
+        logger.handlers = []
+
+        # Setup logging to stdout
+        ch = logging.StreamHandler(sys.stdout)
+        ch.setFormatter(logformat)
+        logger.addHandler(ch)
+
+        # Get log filename
+        args = parse_args(argv)
+        log_filename = os.path.join(args.log_directory, LOG_RELATIVE_PATH)
+
+        # Make log dir
+        try:
+            os.makedirs(os.path.dirname(log_filename))
+        except FileExistsError:
+            pass
+        except PermissionError as e:
+            print("Permission denied. Exiting.")
+            sys.exit(1)
+
+        # Setup logging to file
+        fh = logging.handlers.RotatingFileHandler(log_filename, maxBytes=(1048576*5), backupCount=7)
+        fh.setFormatter(logformat)
+        logger.addHandler(fh)
+
+        # Make backups
+        backup_manager = BackupManager(args)
         backup_manager.run()
+
+        # Close loggers
+        fh.close()
+        ch.close()
+        logger.removeHandler(fh)
+        logger.removeHandler(ch)
+
     except Exception as e:
         print('Making backups failed.')
         traceback.print_exc()
