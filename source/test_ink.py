@@ -508,18 +508,6 @@ class RunBackupsUnitTest(unittest.TestCase):
         backup_dirname = os.path.realpath(
             os.path.join(self.backups_container_dirname, self.link_name))
 
-        # List contents of backups directory
-        print('')
-        print('Contents of {:s}'.format(self.backups_container_dirname))
-        ink.run_shell_command(['ls', '-l', self.backups_container_dirname])
-        print('')
-        print('Contents of {:s}'.format(first_backup_dirname + '_bak'))
-        ink.run_shell_command(['ls', '-l', first_backup_dirname + '_bak'])
-        print('')
-        print('Contents of {:s}'.format(backup_dirname))
-        ink.run_shell_command(['ls', '-l', backup_dirname])
-        print('')
-
     def tearDown(self):
         # Clean up temporary directory
         self.root_dir.cleanup()
