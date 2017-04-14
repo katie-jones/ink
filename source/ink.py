@@ -440,8 +440,9 @@ class BackupInstance:
             raise ValueError("The directory to backup (option 'to_backup') "
                              "must be an absolute path.")
 
-        # Option 'backup_folder' must be given
-        if len(config.get('backup_folder')) == 0:
+        # Option 'backup_folder' must be given if no mount point is given
+        if len(config.get('backup_folder')) == 0 and \
+                len(config.get('mount_point')) == 0:
             raise ValueError("The directory where the backups are stored "
                              "(option 'backup_folder') must be given.")
 
